@@ -28,7 +28,7 @@ public class MyRedisSource implements SourceFunction<HashMap<String,String>> {
     private Jedis jedis = null;
 
     public void run(SourceContext<HashMap<String, String>> ctx) throws Exception {
-        this.jedis =  new Jedis("linux01",6379);
+        this.jedis =  new Jedis("192.168.0.20",6379,10000);
         //存储所有国家和大区对应的关系
         HashMap<String, String> keyValueMap = new HashMap<String, String>();
         while (isRunning) {
@@ -55,7 +55,7 @@ public class MyRedisSource implements SourceFunction<HashMap<String,String>> {
                 Thread.sleep(SLEEP_MILLION);
             }catch (JedisConnectionException e) {
                 logger.error("redis连接异常，重新获取连接",e.getCause());
-                jedis = new Jedis("linux01", 6379);
+                jedis = new Jedis("192.168.0.20",6379,10000);
             }catch (Exception e){
                 logger.error("source 的redis数据源异常"+e.getCause());
             }

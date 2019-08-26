@@ -9,8 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>DataClean</artifactId>
-    <packaging>pom</packaging>
+    <artifactId>DataCleanScala</artifactId>
 
 
     <dependencies>
@@ -83,5 +82,4 @@
             <artifactId>fastjson</artifactId>
         </dependency>
     </dependencies>
-
 </project>

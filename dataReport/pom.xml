@@ -9,9 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>DataClean</artifactId>
-    <packaging>pom</packaging>
-
+    <artifactId>dataReport</artifactId>
 
     <dependencies>
         <dependency>
@@ -67,7 +65,7 @@
         </dependency>
 
         <dependency>
-            <groupId>net.alchim31.maven</groupId>
+             <groupId>net.alchim31.maven</groupId>
             <artifactId>scala-maven-plugin</artifactId>
         </dependency>
 
@@ -82,6 +80,10 @@
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
         </dependency>
+        <!--flink es依赖-->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-elasticsearch6_2.11</artifactId>
+        </dependency>
     </dependencies>
-
 </project>

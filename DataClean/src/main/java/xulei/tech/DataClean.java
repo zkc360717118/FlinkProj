@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -28,6 +29,8 @@ import java.util.Properties;
 public class DataClean {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        //设置并行度(因为source的来源kafka有5个partition，这里设置并行度为5)，在本地调试的时候建议关闭，方便查看
+        env.setParallelism(5);
         //checkpoint配置
         env.enableCheckpointing(60000);
         env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
@@ -37,23 +40,21 @@ public class DataClean {
         env.getCheckpointConfig().enableExternalizedCheckpoints(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
 
         //设置statebackend
-
-//        env.setStateBackend(new RocksDBStateBackend("hdfs://hadoop100:9000/flink/checkpoints",true));
-
+//        env.setStateBackend(new RocksDBStateBackend("hdfs://linux01:8020/flink/checkpoints",true));
 
         //指定kafkaSource
         String topic = "allData";
         Properties prop = new Properties();
-        prop.put("bootstrap.servers", "linux01:9092");
+        prop.put("bootstrap.servers", "linux01:9092,linux02:9092,linux03:9092");
         prop.put("group.id", "con1");
         FlinkKafkaConsumer011<String> myConsumer = new FlinkKafkaConsumer011<String>(topic, new SimpleStringSchema(), prop);
 
-        //获取kafka中的数据'
+        //获取kafka中的数据
         //{"dt":"2018-01-01 11:11:11","countryCode:"US","data":[{"type":"s1","score":0.3,"level":"A"},{"type":"s2","score":0.1,"level":"B"}]}
         DataStreamSource<String> data = env.addSource(myConsumer);
 
         // 最新的国家码 和大区的映射关系
-        DataStreamSource<HashMap<String, String>> mapData = env.addSource(new MyRedisSource());
+        DataStream<HashMap<String, String>> mapData = env.addSource(new MyRedisSource()).broadcast(); //这里redissource是继承的SourceFunction单线程，如果不添加braodcast，那么下面的flatmap并行多个线程，只有1个线程能获取到redis中的数据
 
         //把data数据和 mapData数据连接整合
         SingleOutputStreamOperator<String> resData = data.connect(mapData).flatMap(new CoFlatMapFunction<String, HashMap<String, String>, String>() {
@@ -66,6 +67,8 @@ public class DataClean {
                 String dt = jsonObject.getString("dt");
                 String countryCode = jsonObject.getString("countryCode");
                 //获取大区
+                System.out.println("大区中map"+allMap);
+                System.out.println("countryCode"+countryCode);
                 String area = allMap.get(countryCode);
 
                 //把大区放入每一个子集json中
@@ -74,7 +77,8 @@ public class DataClean {
                     JSONObject jsonObject1 = jsonArray.getJSONObject(i);
                     jsonObject1.put("area", area);
                     jsonObject1.put("dt", dt);
-                    out.collect(jsonObject.toJSONString()); //输出
+                    System.out.println("结果是"+jsonObject1.toJSONString());
+                    out.collect(jsonObject1.toJSONString()); //输出
                 }
             }
 
@@ -89,7 +93,7 @@ public class DataClean {
         Properties outprop = new Properties();
         outprop.put("bootstrap.servers", "linux01:9092");
         //设置事务超时时间
-        prop.setProperty("transaction.timeout.ms",60000*15+"");
+        outprop.setProperty("transaction.timeout.ms",60000*15+"");
 
         FlinkKafkaProducer011<String> myProducer = new FlinkKafkaProducer011<String>(outTopic, new KeyedSerializationSchemaWrapper<String>(new SimpleStringSchema()), outprop, FlinkKafkaProducer011.Semantic.EXACTLY_ONCE);
         resData.addSink(myProducer);
